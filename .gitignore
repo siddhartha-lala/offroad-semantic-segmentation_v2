@@ -1,0 +1,64 @@
+# ──────────────────────────────────────────────────────────────
+#  Off-Road Semantic Segmentation — .gitignore
+# ──────────────────────────────────────────────────────────────
+
+# ── Model Weights (STRICT: GitHub 100 MB hard limit) ─────────
+*.pth
+*.pt
+*.onnx
+*.engine
+checkpoints/*.pth
+
+# ── Compressed Archives ──────────────────────────────────────
+*.zip
+*.tar.gz
+*.tar
+*.7z
+
+# ── Dataset Folders ──────────────────────────────────────────
+Offroad_Segmentation_*/
+Offroad_Segmentation_Training_Dataset/
+Offroad_Segmentation_testImages/
+
+# ── Output / Prediction Directories ──────────────────────────
+predicted_masks/
+predicted_masks_v2/
+
+# ── Python Cache & Bytecode ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Jupyter / Colab ──────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── IDE & System ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Virtual Environments ─────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Logs & Misc ──────────────────────────────────────────────
+*.log
+wandb/
+runs/
+
+# ── Original Colab Script (not part of clean repo) ───────────
+offseg_improved.py
+
+# ── Raw Screenshots (development artifacts) ──────────────────
+Screenshot *.png
