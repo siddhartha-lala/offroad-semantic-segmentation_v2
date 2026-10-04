@@ -142,7 +142,7 @@ Dominant misclassification patterns on the validation set (% of true-class pixel
 ## 📁 Repository Structure
 
 ```
-offroad-semantic-segmentation/
+offroad-semantic-segmentation_v2/
 ├── .gitignore                  # Excludes *.pth, datasets, caches
 ├── requirements.txt            # Pinned dependencies
 ├── README.md                   # ← You are here
@@ -151,7 +151,7 @@ offroad-semantic-segmentation/
 │   └── demo_overlay.png        # 3-panel visual showcase
 ├── checkpoints/
 │   ├── .gitkeep                # Preserves directory in Git
-│   └── README.md               # Weight download instructions
+│   └── README.md               # Local checkpoint setup guide
 ├── notebooks/
 │   └── README.md               # Colab notebook placement guide
 └── src/
@@ -230,32 +230,61 @@ Output masks are single-channel 8-bit PNGs at 960×540 (nearest-neighbour resize
 
 ---
 
-## 🔬 Technical Details
+## 🧠 Methodology & Model Architecture
 
-### Loss Function
+### 1. What Model Was Used & Why
 
-The composite loss directly optimises the mIoU metric while maintaining stable gradients:
+We engineered a **hybrid architecture** combining a **SegFormer MiT-B3 encoder** with a **U-Net decoder** via `segmentation-models-pytorch`:
 
-$$\mathcal{L} = \underbrace{\mathcal{L}_{\text{Lovász}}}_{\text{mIoU surrogate}} + \underbrace{\mathcal{L}_{\text{CE}}}_{\text{pixel-wise}} + 0.5 \cdot \underbrace{\mathcal{L}_{\text{Dice}}}_{\text{region overlap}}$$
+* **Encoder — SegFormer MiT-B3 (ImageNet-1K Pretrained):**  
+  Unlike standard CNNs (e.g., ResNet) that suffer from restricted receptive fields, SegFormer's hierarchical Mix Transformer utilizes **Overlapping Patch Merging** and **Efficient Self-Attention**. This allows the model to capture non-local spatial context — critical for off-road navigation where long-range terrain continuity (such as distinguishing drivable dirt tracks extending to the horizon from dry grass plains) is paramount.
+* **Decoder — U-Net with Skip Connections:**  
+  While standard SegFormer designs employ lightweight all-MLP decoders, off-road autonomous navigation requires pixel-precise obstacle boundary delineation (e.g., sharp edges of rocks, thin tree trunks, and chassis-threatening logs). The U-Net decoder fuses deep semantic features with early high-resolution spatial feature maps across multiple scales, recovering fine obstacle geometry that pure MLP heads often smooth over.
 
-### Training Configuration
+---
 
-| Parameter | Value |
-|:---|:---|
-| Encoder | SegFormer MiT-B3 (ImageNet) |
-| Decoder | U-Net |
-| Resolution | 544 × 960 (÷32 aligned, ≈16:9) |
-| Batch Size | 4 × 2 gradient accumulation = 8 effective |
-| Optimizer | AdamW (enc: 6e-5, dec: 6e-4, wd: 1e-2) |
-| Schedule | Linear warmup → Cosine annealing |
-| EMA Decay | 0.999 |
-| Precision | AMP FP16 (GradScaler) |
-| Epochs | 40 |
-| Hardware | Google Colab T4 GPU (16 GB VRAM) |
+### 2. How It Was Accomplished: The 5-Pillar Engineering Recipe
 
-### Test-Time Augmentation
+Reaching **71.70% mIoU** (+30.5 points over standard baselines) required solving extreme class imbalance, boundary noise, and memory limits on a single T4 GPU:
 
-Multi-scale TTA at **0.75×**, **1.0×**, and **1.25×** with horizontal flipping accumulates 6 softmax predictions, then takes the argmax for robust boundary delineation and minority-class recall.
+#### ① Native 16:9 Aspect-Ratio Resolution (`544 × 960`)
+Standard vision models downsample or squarify inputs to `512 × 512`, destroying the vehicle camera's native 16:9 wide field of view and distorting low-lying obstacles. We trained directly at **544 × 960**, which preserves wide camera perspective and is strictly divisible by 32 (matching the 5-stage downsampling factor of the encoder).
+
+#### ② Tackling Extreme Desert Class Imbalance
+In semi-arid terrain, majority classes (*Sky* and *Landscape/Dirt*) account for >80% of all pixels, while critical hazards (*Rocks*, *Logs*, *Ground Clutter*) make up less than 3%. A standard random sampler causes models to collapse onto majority classes.  
+* **Solution:** We implemented a class-frequency-aware `WeightedRandomSampler` that computes inverse-root frequency weights for each training tile, ensuring minority obstacle classes are prioritized in every mini-batch.
+
+#### ③ Direct Metric Optimization: Composite Hybrid Loss
+Standard Cross-Entropy loss optimizes global pixel accuracy, meaning a model can achieve ~90% accuracy by simply predicting Sky and Dirt while missing every rock and log on the path (yielding ~41% mIoU).  
+* **Solution:** We designed a three-part composite loss function:
+  $$\mathcal{L} = \underbrace{\mathcal{L}_{\text{Lovász-Softmax}}}_{\text{Direct mIoU Surrogate}} + \underbrace{\mathcal{L}_{\text{CE}}}_{\text{Pixel-wise Smoothness}} + 0.5 \cdot \underbrace{\mathcal{L}_{\text{Dice}}}_{\text{Region Overlap}}$$
+  * **Lovász-Softmax:** Serves as a differentiable convex surrogate for the discrete Jaccard index (mIoU), directly forcing the gradients to penalize low-IoU obstacle classes.
+  * **Dice Loss:** Enforces spatial overlap and suppresses boundary bleeding.
+  * **Cross-Entropy:** Maintains stable optimization trajectories in early training epochs.
+
+#### ④ Differential Learning Rates & EMA Shadow Weights
+* **Differential Learning Rates:** Fine-tuning the pretrained transformer backbone too aggressively destroys ImageNet feature representations. We assigned differential learning rates: `6e-5` for the MiT-B3 backbone and `6e-4` (10× higher) for the randomly initialized U-Net decoder, scheduled with a 5-epoch linear warmup followed by cosine annealing.
+* **Exponential Moving Average (EMA, decay=0.999):** We maintained a shadow model with exponential weight averaging throughout all 40 epochs. The EMA checkpoint eliminates stochastic batch oscillations and generalises significantly better to unseen lighting conditions.
+
+#### ⑤ Multi-Scale Test-Time Augmentation (TTA)
+During inference, each image is passed through the network across multiple scales (**0.75×, 1.0×, 1.25×**) along with horizontal flipping (6 total forward passes). The resulting softmax probability maps are accumulated and averaged prior to argmax extraction, reducing false positive obstacle detections and refining hazard boundaries.
+
+---
+
+### ⚙️ Training Specifications
+
+| Parameter | Value | Rationale |
+|:---|:---|:---|
+| **Encoder Backbone** | SegFormer MiT-B3 (`mit_b3`) | Transformer global context + multi-scale representations |
+| **Decoder** | U-Net | Skip connections for high-resolution obstacle edge recovery |
+| **Input Resolution** | 544 × 960 (divisible by 32) | Native 16:9 aspect ratio preservation |
+| **Effective Batch Size** | 8 (4 per step × 2 grad accumulation) | Fits within 16 GB VRAM while stabilizing gradients |
+| **Optimizer** | AdamW (`wd=1e-2`) | Weight decay for transformer regularization |
+| **Learning Rates** | Encoder: `6e-5` \| Decoder: `6e-4` | Differential LR protects pretrained weights |
+| **LR Scheduler** | Linear Warmup (5 ep) → Cosine Annealing | Prevents early gradient explosion |
+| **Regularization** | EMA (`decay=0.999`) | Prevents checkpoint over-fitting |
+| **Mixed Precision** | PyTorch AMP FP16 (`GradScaler`) | 2× speedup and 50% memory savings |
+| **Hardware** | Single Google Colab T4 GPU (16 GB) | Cost-effective and reproducible |
 
 ---
 
