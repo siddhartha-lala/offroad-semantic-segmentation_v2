@@ -4,15 +4,18 @@
 
 ### Autonomous Scene Understanding for Unstructured Desert Terrain
 
+[![Architecture SegFormer MiT-B3 + U-Net](https://img.shields.io/badge/Model-SegFormer%20MiT--B3%20%2B%20U--Net-8A2BE2?style=for-the-badge)](https://github.com/qubvel-org/segmentation_models.pytorch)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![SMP 0.3+](https://img.shields.io/badge/SMP-0.3%2B-00C7B7?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJMMyA3djEwbDkgNSA5LTVWN2wtOS01eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/qubvel-org/segmentation_models.pytorch)
+[![SMP 0.3+](https://img.shields.io/badge/SMP-0.3%2B-00C7B7?style=for-the-badge)](https://github.com/qubvel-org/segmentation_models.pytorch)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![Colab T4 Verified](https://img.shields.io/badge/Colab-T4%20Verified-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)](https://colab.research.google.com/)
 
-*High-resolution semantic segmentation pipeline achieving **71.70% mIoU** on 11 navigational terrain classes — a **+30 point** improvement over standard cross-entropy baselines — trained on Falcon simulation data for autonomous ground vehicles (AGVs) navigating semi-arid desert environments.*
+*High-resolution semantic segmentation pipeline powered by a **SegFormer MiT-B3 + U-Net** architecture, achieving **71.70% mIoU** on 11 navigational terrain classes — a **+30.5 point gain** over standard cross-entropy baselines.*
 
 </div>
+
+> ⚡ **Model at a Glance:** **SegFormer MiT-B3** (Mix Transformer encoder) coupled with a **U-Net** decoder (multi-scale skip connections), optimized with **Lovász-Softmax + CE + Dice** composite loss at native **544×960** resolution.
 
 ---
 
